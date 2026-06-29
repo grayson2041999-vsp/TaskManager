@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Task Manager · Eisenhower + MIT</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f4e79">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tasks">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --muted:#64748b; --text:#1e293b;
@@ -68,6 +74,15 @@
   .qempty{font-size:12px;color:#94a3b8;text-align:center;padding:8px;font-style:italic}
   .today-list{display:flex;flex-direction:column;gap:10px;max-width:680px}
   .empty{text-align:center;color:var(--muted);padding:40px;font-size:13px;background:#fff;border-radius:12px;border:1px dashed var(--line)}
+  /* daily MIT banner */
+  .mit-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start}
+  .mit-banner .mb-ico{font-size:22px;line-height:1}
+  .mit-banner .mb-body{flex:1}
+  .mit-banner h4{margin:0 0 6px;font-size:14px;color:#92400e}
+  .mit-banner ul{margin:0;padding-left:18px;font-size:13px;color:#1e293b}
+  .mit-banner li{margin-bottom:2px}
+  .mit-banner .mb-ack{background:#92400e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap}
+  .mit-banner .mb-ack:hover{background:#7c360b}
   /* completed */
   .policy{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:12px 14px;font-size:12.5px;margin-bottom:14px;line-height:1.5;max-width:760px}
   .done-list{display:flex;flex-direction:column;gap:9px;max-width:760px}
@@ -185,6 +200,7 @@
 </header>
 
 <div class="wrap">
+  <div id="mitBanner" class="mit-banner" style="display:none"></div>
   <div class="tabs">
     <div class="tab active" data-view="today" onclick="setView('today')">🎯 Today</div>
     <div class="tab" data-view="mat:main" onclick="setView('mat:main')">🗂 Main work</div>
@@ -386,6 +402,21 @@ function syncDateDisp(id){
   d.classList.toggle("empty", !v);
 }
 function clearDate(id){ const el=document.getElementById(id); if(el.disabled) return; el.value=""; syncDateDisp(id); }
+// ----- daily MIT banner (Phase 1: in-app reminder) -----
+function mitAckKey(){ return "mit_ack_"+todayStr(); }
+function renderMitBanner(){
+  const el=document.getElementById("mitBanner"); if(!el) return;
+  const mits=tasks.filter(t=>t.mit && t.status!=="Done");
+  if(!mits.length || localStorage.getItem(mitAckKey())){ el.style.display="none"; return; }
+  el.innerHTML = `<div class="mb-ico">🎯</div>
+    <div class="mb-body">
+      <h4>Most Important Tasks · ${fmtDate(todayStr())}</h4>
+      <ul>${mits.map(t=>`<li>${esc(t.name)}</li>`).join("")}</ul>
+    </div>
+    <button class="mb-ack" onclick="ackMit()">Đã đọc</button>`;
+  el.style.display="flex";
+}
+function ackMit(){ localStorage.setItem(mitAckKey(),"1"); renderMitBanner(); }
 function pickDate(id){
   const el=document.getElementById(id);
   if(el.disabled) return;
@@ -733,6 +764,7 @@ function render(){
   c.innerHTML=html;
   if(view==="calendar") bindCalendar();
   document.getElementById("seedBtn").style.display = (tasks.length||view==="calendar"||view==="completed") ? "none":"inline-block";
+  renderMitBanner();
 }
 
 function seed(){
@@ -753,6 +785,8 @@ function seed(){
 document.getElementById("overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
 document.getElementById("evOverlay").addEventListener("click",e=>{ if(e.target.id==="evOverlay") closeEvent(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); closeEvent(); } });
+// PWA: register service worker (only works over https / installed app)
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 load();
 </script>
 </body>
