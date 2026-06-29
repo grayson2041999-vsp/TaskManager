@@ -196,7 +196,10 @@
     <h1>🗂️ Task Manager</h1>
     <div class="sub">Eisenhower Matrix + M.I.T · data stored in this browser</div>
   </div>
-  <button class="btn" onclick="openModal()">+ Add task</button>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" id="notifBtn" onclick="enableNotifications()">🔔 Bật thông báo</button>
+    <button class="btn" onclick="openModal()">+ Add task</button>
+  </div>
 </header>
 
 <div class="wrap">
@@ -417,6 +420,50 @@ function renderMitBanner(){
   el.style.display="flex";
 }
 function ackMit(){ localStorage.setItem(mitAckKey(),"1"); renderMitBanner(); }
+// ----- Web Push subscription (Phase 2) -----
+const VAPID_PUBLIC = "BHxIBpr5RSavtD_EJFkF3CCimkgf9Qt2-ywYEEu75ZcTXIKHO2JHvtiRptmSbhHTUMr7Zt0pCKhwPAqKz_31XUQ";
+function urlB64ToUint8Array(b64){
+  const pad="=".repeat((4-b64.length%4)%4);
+  const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(s); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+function updateNotifBtn(on){
+  const b=document.getElementById("notifBtn"); if(!b) return;
+  b.textContent = on ? "🔔 Đã bật" : "🔔 Bật thông báo";
+}
+async function refreshNotifState(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)) return;
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    updateNotifBtn(!!sub && Notification.permission==="granted");
+  }catch(e){}
+}
+async function enableNotifications(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)){
+      alert("Trình duyệt này không hỗ trợ thông báo đẩy. Trên iPhone: hãy mở từ biểu tượng đã Add to Home Screen."); return;
+    }
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){ alert("Bạn chưa cho phép thông báo. Vào cài đặt trình duyệt để bật lại."); return; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8Array(VAPID_PUBLIC) });
+    }
+    const j=sub.toJSON();
+    if(cloud){
+      const r=await sb.from("push_subscriptions").upsert({ endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth });
+      if(r.error) throw r.error;
+    } else {
+      alert("Lưu ý: chưa kết nối Supabase nên đăng ký chưa được lưu để gửi push.");
+    }
+    updateNotifBtn(true);
+    alert("Đã bật thông báo MIT hằng ngày 🎉");
+  }catch(e){ console.error(e); alert("Bật thông báo thất bại: "+(e.message||e)); }
+}
 function pickDate(id){
   const el=document.getElementById(id);
   if(el.disabled) return;
@@ -786,7 +833,7 @@ document.getElementById("overlay").addEventListener("click",e=>{ if(e.target.id=
 document.getElementById("evOverlay").addEventListener("click",e=>{ if(e.target.id==="evOverlay") closeEvent(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); closeEvent(); } });
 // PWA: register service worker (only works over https / installed app)
-if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").then(()=>refreshNotifState()).catch(()=>{}); }
 load();
 </script>
 </body>

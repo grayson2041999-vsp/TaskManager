@@ -21,7 +21,30 @@ self.addEventListener("fetch", (e) => {
   }
 });
 
-/* --- Phase 2 placeholder (push notifications) ---
-self.addEventListener("push", (event) => { ... });
-self.addEventListener("notificationclick", (event) => { ... });
-*/
+// --- Push notifications (Phase 2/3) ---
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch (e) { data = { body: event.data ? event.data.text() : "" }; }
+  const title = data.title || "🎯 MIT hôm nay";
+  const options = {
+    body: data.body || "Mở app để xem việc quan trọng nhất hôm nay.",
+    icon: "icon-192.png",
+    badge: "icon-192.png",
+    tag: data.tag || "mit-daily",   // same tag => only one notification per day
+    renotify: false,
+    data: { url: data.url || "./" }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "./";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ("focus" in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});
