@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Manager · Eisenhower + MIT</title>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --muted:#64748b; --text:#1e293b;
+    --q1:#8CC63F; --q1d:#4f7a12; --q1b:#eef6df;
+    --q2:#27AAE1; --q2d:#13688c; --q2b:#ddf1fb;
+    --q3:#FBB040; --q3d:#a96d05; --q3b:#fef1da;
+    --q4:#EF4136; --q4d:#b51a11; --q4b:#fde0de;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  header{background:linear-gradient(100deg,#8CC63F 0%,#27AAE1 38%,#FBB040 70%,#EF4136 100%);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  header h1{font-size:19px;margin:0;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.25)}
+  header .sub{font-size:12px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .wrap{max-width:1140px;margin:0 auto;padding:20px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .tab{padding:9px 16px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:700;transition:.12s;text-transform:uppercase;letter-spacing:.4px}
+  .tab:hover{border-color:#cbd5e1}
+  .tab.active{color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(0,0,0,.15)}
+  .tab.active[data-view="today"]{background:#334155}
+  .tab.active[data-view="mat:main"]{background:#8CC63F}
+  .tab.active[data-view="mat:group"]{background:#27AAE1}
+  .tab.active[data-view="mat:biz"]{background:#FBB040}
+  .tab.active[data-view="calendar"]{background:#6366f1}
+  .tab.active[data-view="completed"]{background:#0f766e}
+  .btn{background:#fff;color:#1f2937;border:none;padding:9px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  .btn:hover{background:#f8fafc}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);box-shadow:none}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+  .count{color:var(--muted);font-size:13px}
+  /* matrix */
+  .matrix-grid{display:grid;grid-template-columns:34px 1fr 1fr;grid-template-rows:30px 1fr 1fr;gap:10px}
+  .axis{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:.6px;background:#e8edf3;border-radius:7px}
+  .axis.v{writing-mode:vertical-rl;transform:rotate(180deg)}
+  .quad{background:#fff;border:2.5px solid;border-radius:14px;padding:14px;min-height:210px;display:flex;flex-direction:column}
+  .quad.q1{border-color:var(--q1)} .quad.q2{border-color:var(--q2)}
+  .quad.q3{border-color:var(--q3)} .quad.q4{border-color:var(--q4)}
+  .quad .qhead{margin-bottom:10px}
+  .quad .qhead .en{font-size:24px;font-weight:800;line-height:1}
+  .quad.q1 .en{color:var(--q1d)} .quad.q2 .en{color:var(--q2d)}
+  .quad.q3 .en{color:var(--q3d)} .quad.q4 .en{color:var(--q4d)}
+  .quad .qhead .desc{font-size:11.5px;color:var(--muted);margin-top:3px;font-weight:600}
+  .quad .qbody{flex:1;display:flex;flex-direction:column;gap:8px;overflow:auto}
+  /* task cards */
+  .task{background:#fff;border:1px solid #eef2f7;border-left-width:5px;border-radius:10px;padding:10px 12px;cursor:pointer;transition:.12s;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .task:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+  .task.done{opacity:.7}
+  .task .top{display:flex;align-items:flex-start;gap:8px}
+  .task .name{font-weight:600;flex:1;font-size:13px}
+  .task.done .name{text-decoration:line-through}
+  .star{cursor:pointer;font-size:16px;line-height:1}
+  .badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;align-items:center}
+  .chip{font-size:11px;padding:2px 8px;border-radius:20px;background:#eef2f7;color:var(--muted);white-space:nowrap}
+  .chip.mit{background:#fef3c7;color:#92400e;font-weight:700}
+  .chip.q1{background:var(--q1b);color:var(--q1d)} .chip.q2{background:var(--q2b);color:var(--q2d)}
+  .chip.q3{background:var(--q3b);color:var(--q3d)} .chip.q4{background:var(--q4b);color:var(--q4d)}
+  .chip.cat{background:#e0e7ff;color:#3730a3}
+  .chip.st{background:#e2e8f0;color:#334155;cursor:pointer}
+  .chip.due{background:#dcfce7;color:#166534} .chip.overdue{background:#fee2e2;color:#991b1b;font-weight:700}
+  .step{font-size:11.5px;color:#475569;margin-top:6px;background:#f8fafc;border-radius:6px;padding:5px 8px;border-left:3px solid #94a3b8}
+  .link{font-size:11.5px;color:#1d4ed8;text-decoration:none;margin-top:5px;display:inline-block}
+  .link:hover{text-decoration:underline}
+  .qempty{font-size:12px;color:#94a3b8;text-align:center;padding:8px;font-style:italic}
+  .today-list{display:flex;flex-direction:column;gap:10px;max-width:680px}
+  .empty{text-align:center;color:var(--muted);padding:40px;font-size:13px;background:#fff;border-radius:12px;border:1px dashed var(--line)}
+  /* completed */
+  .policy{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:12px 14px;font-size:12.5px;margin-bottom:14px;line-height:1.5;max-width:760px}
+  .done-list{display:flex;flex-direction:column;gap:9px;max-width:760px}
+  .done-row{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px}
+  .done-row .nm{flex:1}
+  .done-row .nm .t{font-weight:600;text-decoration:line-through;color:#64748b}
+  .done-row .meta{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .mini{font-size:11.5px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 9px;cursor:pointer;font-weight:600}
+  .mini.danger{color:var(--q4d);border-color:#fecaca}
+  .soon{color:#b45309;font-weight:700}
+  /* calendar */
+  .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+  .cal-title{font-size:18px;font-weight:800}
+  .cal-nav{display:flex;gap:6px}
+  .cal-hint{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+  .weekdays div{text-align:center;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .day{background:#fff;border:1px solid var(--line);border-radius:8px;min-height:96px;padding:5px 6px;cursor:pointer;user-select:none;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+  .day.out{background:#f8fafc;cursor:default;border-style:dashed}
+  .day.today{border-color:#6366f1;box-shadow:inset 0 0 0 1px #6366f1}
+  .day.sel{background:#eef2ff;border-color:#6366f1}
+  .day .dnum{font-size:12px;font-weight:700;align-self:flex-end;color:#475569}
+  .day.today .dnum{color:#4338ca}
+  .ev{font-size:10.5px;color:#fff;border-radius:5px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.3}
+  /* weekend & Vietnam holidays */
+  .day.weekend{background:#f4f7fb}
+  .day.holiday{background:#fdecea}
+  .day.holiday .dnum{color:#b51a11}
+  .weekdays div.we{color:#b51a11}
+  .hol{font-size:9px;font-weight:700;color:#fff;background:#ef4136;border-radius:4px;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+  .cal-legend{font-size:11.5px;color:var(--muted);margin:8px 0 12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px}
+  .sw{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.08)}
+  /* calendar View/Edit toggle */
+  .mode-toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-right:4px}
+  .mode-toggle button{border:none;background:#fff;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted)}
+  .mode-toggle button.on{background:#6366f1;color:#fff}
+  /* custom date field — forces DD/MM/YYYY display on every OS */
+  .datefield{position:relative;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;background:#fff;cursor:pointer}
+  .datefield:hover{border-color:#cbd5e1}
+  .date-disp{flex:1;font-size:13px;color:#1e293b}
+  .date-disp.empty{color:#9aa6b2}
+  .date-ico{font-size:14px;opacity:.65}
+  .date-clear{border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px;padding:0 2px}
+  .date-hidden{position:absolute;left:10px;bottom:0;width:1px;height:1px;opacity:0;padding:0;border:0;pointer-events:none}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;z-index:50}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:520px;padding:24px}
+  .modal h2{margin:0 0 4px;font-size:17px}
+  .modal .editing-name{font-size:13px;color:var(--muted);margin-bottom:14px;display:none}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
+  .field textarea{resize:vertical;min-height:60px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .checks{display:flex;gap:16px;flex-wrap:wrap}
+  .check{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;font-weight:600}
+  .check input{width:16px;height:16px}
+  .preview{font-size:13px;padding:9px 12px;border-radius:8px;margin-top:6px;font-weight:700}
+  .disclosure{display:flex;align-items:center;gap:8px;width:100%;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:9px 12px;cursor:pointer;font-size:13px;font-weight:700;color:#334155;margin:6px 0 14px}
+  .disclosure .arrow{transition:transform .15s;display:inline-block}
+  .disclosure.open .arrow{transform:rotate(90deg)}
+  .primary-block{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fcfdff;margin-bottom:4px}
+  .primary-block .field:last-child{margin-bottom:0}
+  .primary-title{font-size:12px;font-weight:800;color:var(--q3d);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+  .modal-actions{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+  .modal-actions .right{display:flex;gap:8px}
+  .btn-save{background:#334155;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700}
+  .del{background:#fff;color:var(--q4d);border:1px solid #fecaca;padding:9px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:16px}
+  /* ===== Responsive: phones (portrait) ===== */
+  @media (max-width:640px){
+    header{padding:13px 16px}
+    header h1{font-size:17px}
+    header .sub{font-size:11px}
+    .btn{padding:8px 13px;font-size:12.5px}
+    .wrap{padding:14px}
+    .tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+    .tab{padding:7px 11px;font-size:11px;white-space:nowrap;flex:0 0 auto}
+    /* matrix: stack the four quadrants in priority order */
+    .matrix-grid{display:flex;flex-direction:column;gap:10px}
+    .matrix-grid .axis{display:none}
+    .quad{min-height:auto}
+    .quad .qhead .en{font-size:21px}
+    .today-list{max-width:100%}
+    /* calendar compact */
+    .cal-head{align-items:flex-start}
+    .cal-title{font-size:16px}
+    .cal-nav .btn{padding:7px 9px;font-size:12px}
+    .weekdays{gap:3px}
+    .weekdays div{font-size:9px}
+    .cal-grid{gap:3px}
+    .day{min-height:58px;padding:3px 4px;border-radius:6px}
+    .day .dnum{font-size:11px}
+    .ev{font-size:9px;padding:1px 4px}
+    /* modals fit narrow screens */
+    .modal{padding:18px;border-radius:14px}
+    .row2{grid-template-columns:1fr;gap:0}
+    .checks{gap:12px}
+    .done-row{flex-wrap:wrap}
+    .done-row .nm{flex:1 1 100%}
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🗂️ Task Manager</h1>
+    <div class="sub">Eisenhower Matrix + M.I.T · data stored in this browser</div>
+  </div>
+  <button class="btn" onclick="openModal()">+ Add task</button>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-view="today" onclick="setView('today')">🎯 Today</div>
+    <div class="tab" data-view="mat:main" onclick="setView('mat:main')">🗂 Main work</div>
+    <div class="tab" data-view="mat:group" onclick="setView('mat:group')">🤝 Community</div>
+    <div class="tab" data-view="mat:biz" onclick="setView('mat:biz')">💼 Business</div>
+    <div class="tab" data-view="calendar" onclick="setView('calendar')">📅 Calendar</div>
+    <div class="tab" data-view="completed" onclick="setView('completed')">✅ Completed</div>
+  </div>
+  <div class="toolbar">
+    <div class="count" id="count"></div>
+    <button class="btn ghost" onclick="seed()" id="seedBtn">Create sample data</button>
+  </div>
+  <div id="content"></div>
+</div>
+
+
+<!-- Task modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add task</h2>
+    <div class="editing-name" id="editingName"></div>
+    <input type="hidden" id="f_id">
+    <button class="disclosure" id="detailsToggle" onclick="toggleDetails()">
+      <span class="arrow" id="detailsArrow">▸</span> <span>Task details</span>
+    </button>
+    <div id="detailsBlock">
+      <div class="field">
+        <label>Task name *</label>
+        <input type="text" id="f_name" placeholder="e.g. Draft weekly report">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Category</label>
+          <select id="f_cat">
+            <option value="main">🗂 Main work</option>
+            <option value="group">🤝 Community work</option>
+            <option value="biz">💼 Business</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Due date (DD/MM/YYYY)</label>
+          <div class="datefield" onclick="pickDate('f_due')">
+            <span class="date-disp empty" id="f_due_disp">dd/mm/yyyy</span>
+            <span class="date-ico">📅</span>
+            <button type="button" class="date-clear" onclick="event.stopPropagation();clearDate('f_due')" title="Clear">✕</button>
+            <input type="date" id="f_due" class="date-hidden" tabindex="-1" onchange="syncDateDisp('f_due')">
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Eisenhower classification</label>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="f_urgent" onchange="updatePreview()"> Urgent</label>
+          <label class="check"><input type="checkbox" id="f_important" onchange="updatePreview()"> Important</label>
+          <label class="check"><input type="checkbox" id="f_mit"> ⭐ MIT today</label>
+        </div>
+        <div class="preview" id="preview"></div>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f_status">
+          <option>To do</option><option>In progress</option><option>Paused</option><option>Done</option>
+        </select>
+      </div>
+    </div>
+    <div class="primary-block">
+      <div class="primary-title">▶ Continue where you left off</div>
+      <div class="field">
+        <label>Current step (where you stopped)</label>
+        <textarea id="f_step" placeholder="e.g. finished part A, still need to email B"></textarea>
+      </div>
+      <div class="field">
+        <label>Related link</label>
+        <input type="url" id="f_link" placeholder="https://…">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="del" id="delBtn" onclick="delTask()" style="visibility:hidden">Delete</button>
+      <div class="right">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn-save" onclick="saveTask()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Event modal -->
+<div class="overlay" id="evOverlay">
+  <div class="modal">
+    <h2 id="evTitle">New event</h2>
+    <input type="hidden" id="e_id">
+    <div class="field">
+      <label>Event name *</label>
+      <input type="text" id="e_name" placeholder="e.g. Team meeting, Trip to Da Nang">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Start date (DD/MM/YYYY)</label>
+        <div class="datefield" onclick="pickDate('e_start')">
+          <span class="date-disp empty" id="e_start_disp">dd/mm/yyyy</span>
+          <span class="date-ico">📅</span>
+          <button type="button" class="date-clear" onclick="event.stopPropagation();clearDate('e_start')" title="Clear">✕</button>
+          <input type="date" id="e_start" class="date-hidden" tabindex="-1" onchange="syncDateDisp('e_start')">
+        </div>
+      </div>
+      <div class="field">
+        <label>End date (DD/MM/YYYY)</label>
+        <div class="datefield" onclick="pickDate('e_end')">
+          <span class="date-disp empty" id="e_end_disp">dd/mm/yyyy</span>
+          <span class="date-ico">📅</span>
+          <button type="button" class="date-clear" onclick="event.stopPropagation();clearDate('e_end')" title="Clear">✕</button>
+          <input type="date" id="e_end" class="date-hidden" tabindex="-1" onchange="syncDateDisp('e_end')">
+        </div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Start time</label>
+        <input type="time" id="e_stime">
+      </div>
+      <div class="field">
+        <label>End time</label>
+        <input type="time" id="e_etime">
+      </div>
+    </div>
+    <div class="field">
+      <label>Note</label>
+      <textarea id="e_note" placeholder="Location, agenda, details…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="del" id="evDelBtn" onclick="delEvent()" style="display:none">Delete</button>
+      <div class="right">
+        <button class="btn ghost" id="evCancelBtn" onclick="closeEvent()">Cancel</button>
+        <button class="btn-save" id="evSaveBtn" onclick="saveEvent()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = "qlcv_tasks_v3";
+const EVKEY = "qlcv_events_v1";
+const RETENTION_DAYS = 30;
+
+/* ============================================================
+   SUPABASE SYNC (optional) — paste your project keys below to
+   sync across devices. Leave blank to keep working offline
+   (data stored only in this browser).
+   ============================================================ */
+const SB_URL = "https://clcmkelyxqdawcintqpa.supabase.co";   // Project URL
+const SB_KEY = "sb_publishable_rgyaq1-zaaezL-pmSFef6Q_NFV86yAA";   // publishable key
+let sb = null, cloud = false;
+try{
+  if(SB_URL && SB_KEY && !SB_URL.includes("paste") && window.supabase){
+    sb = window.supabase.createClient(SB_URL, SB_KEY);
+    cloud = true;
+  }
+}catch(e){ cloud = false; }
+
+let tasks = [], events = [];
+let view = "today";
+let calY, calM;
+const _now=new Date(); calY=_now.getFullYear(); calM=_now.getMonth();
+
+const CATS = {
+  main:{label:"Main work", icon:"🗂"},
+  group:{label:"Community work", icon:"🤝"},
+  biz:{label:"Business", icon:"💼"},
+};
+const QUADS = {
+  q1:{en:"Do", desc:"Important & urgent"},
+  q2:{en:"Schedule", desc:"Important, not urgent"},
+  q3:{en:"Delegate", desc:"Urgent, not important"},
+  q4:{en:"Eliminate", desc:"Not urgent, not important"},
+};
+const STATUSES=["To do","In progress","Paused","Done"];
+let calEdit=false; // calendar mode: false = View, true = Edit
+// Official Vietnam public holidays (2026–2027). Lunar dates per announced calendar.
+const VN_HOLIDAYS = {
+  // 2026
+  "2026-01-01":"Tết Dương lịch",
+  "2026-02-16":"Tết Nguyên Đán","2026-02-17":"Tết (Mùng 1)","2026-02-18":"Tết (Mùng 2)","2026-02-19":"Tết (Mùng 3)","2026-02-20":"Tết (Mùng 4)",
+  "2026-04-26":"Giỗ Tổ Hùng Vương",
+  "2026-04-30":"Giải phóng miền Nam",
+  "2026-05-01":"Quốc tế Lao động",
+  "2026-09-01":"Quốc khánh","2026-09-02":"Quốc khánh",
+  // 2027
+  "2027-01-01":"Tết Dương lịch",
+  "2027-02-05":"Tết Nguyên Đán","2027-02-06":"Tết (Mùng 1)","2027-02-07":"Tết (Mùng 2)","2027-02-08":"Tết (Mùng 3)","2027-02-09":"Tết (Mùng 4)",
+  "2027-04-16":"Giỗ Tổ Hùng Vương",
+  "2027-04-30":"Giải phóng miền Nam",
+  "2027-05-01":"Quốc tế Lao động",
+  "2027-09-01":"Quốc khánh","2027-09-02":"Quốc khánh",
+};
+function syncDateDisp(id){
+  const v=document.getElementById(id).value;
+  const d=document.getElementById(id+"_disp");
+  d.textContent = v? fmtDate(v) : "dd/mm/yyyy";
+  d.classList.toggle("empty", !v);
+}
+function clearDate(id){ const el=document.getElementById(id); if(el.disabled) return; el.value=""; syncDateDisp(id); }
+function pickDate(id){
+  const el=document.getElementById(id);
+  if(el.disabled) return;
+  if(typeof el.showPicker==="function"){ try{ el.showPicker(); return; }catch(e){} }
+  el.focus(); el.click(); // fallback for older browsers
+}
+function quadOf(t){
+  if(t.urgent && t.important) return "q1";
+  if(!t.urgent && t.important) return "q2";
+  if(t.urgent && !t.important) return "q3";
+  return "q4";
+}
+/* ---- field mapping between app objects and DB columns ---- */
+function toDbTask(t){ return { id:t.id, name:t.name, cat:t.cat, due:t.due||null, urgent:!!t.urgent, important:!!t.important, mit:!!t.mit, status:t.status, step:t.step||null, link:t.link||null, completed_at: t.completedAt? new Date(t.completedAt).toISOString():null }; }
+function fromDbTask(r){ return { id:r.id, name:r.name, cat:r.cat, due:r.due||"", urgent:!!r.urgent, important:!!r.important, mit:!!r.mit, status:r.status, step:r.step||"", link:r.link||"", completedAt: r.completed_at? new Date(r.completed_at).getTime():null }; }
+function toDbEvent(e){ return { id:e.id, title:e.title, start_date:e.start, end_date:e.end, start_time:e.startTime||null, end_time:e.endTime||null, note:e.note||null }; }
+function fromDbEvent(r){ return { id:r.id, title:r.title, start:r.start_date, end:r.end_date, startTime:r.start_time||"", endTime:r.end_time||"", note:r.note||"" }; }
+
+function loadLocal(){
+  try{tasks = JSON.parse(localStorage.getItem(KEY))||[]}catch(e){tasks=[]}
+  try{events = JSON.parse(localStorage.getItem(EVKEY))||[]}catch(e){events=[]}
+}
+async function load(){
+  if(cloud){
+    try{
+      const [tr, er] = await Promise.all([ sb.from("tasks").select("*"), sb.from("events").select("*") ]);
+      if(tr.error||er.error) throw (tr.error||er.error);
+      tasks = (tr.data||[]).map(fromDbTask);
+      events = (er.data||[]).map(fromDbEvent);
+    }catch(e){ console.error("Supabase load failed, using local cache:", e); cloud=false; loadLocal(); }
+  } else { loadLocal(); }
+  setSyncBadge();
+  purgeOld();
+  render();
+}
+function setSyncBadge(){
+  const el=document.querySelector("header .sub");
+  if(el) el.textContent = cloud
+    ? "☁ Synced via Supabase — same data on every device"
+    : "Local only · this browser. Add Supabase keys in the file to sync.";
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(tasks)); }
+function saveEvents(){ localStorage.setItem(EVKEY, JSON.stringify(events)); }
+/* per-record cloud writes (fire-and-forget; local cache always updated) */
+function persistTask(t){ save(); if(cloud) sb.from("tasks").upsert(toDbTask(t)).then(r=>{ if(r.error) console.error(r.error); }); }
+function removeTaskCloud(id){ save(); if(cloud) sb.from("tasks").delete().eq("id",id).then(r=>{ if(r.error) console.error(r.error); }); }
+function persistEvent(e){ saveEvents(); if(cloud) sb.from("events").upsert(toDbEvent(e)).then(r=>{ if(r.error) console.error(r.error); }); }
+function removeEventCloud(id){ saveEvents(); if(cloud) sb.from("events").delete().eq("id",id).then(r=>{ if(r.error) console.error(r.error); }); }
+function purgeOld(){
+  const cutoff = Date.now() - RETENTION_DAYS*86400000;
+  const removed = tasks.filter(t => t.status==="Done" && t.completedAt && t.completedAt < cutoff);
+  if(removed.length){
+    tasks = tasks.filter(t => !removed.includes(t));
+    save();
+    if(cloud) removed.forEach(t=>removeTaskCloud(t.id));
+  }
+}
+function todayStr(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function fmtDate(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
+function isoOf(y,m,d){ return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// ---------- task modal ----------
+function setDetails(open){
+  document.getElementById("detailsBlock").style.display = open ? "block" : "none";
+  document.getElementById("detailsToggle").classList.toggle("open", open);
+}
+function toggleDetails(){ setDetails(document.getElementById("detailsBlock").style.display === "none"); }
+function openModal(id){
+  const t = id ? tasks.find(x=>x.id===id) : null;
+  const editing = !!t;
+  document.getElementById("modalTitle").textContent = editing ? "Edit task" : "Add task";
+  const nameEl=document.getElementById("editingName");
+  nameEl.textContent = editing ? ("“"+t.name+"”") : "";
+  nameEl.style.display = editing ? "block" : "none";
+  document.getElementById("f_id").value = t? t.id : "";
+  document.getElementById("f_name").value = t? t.name : "";
+  document.getElementById("f_cat").value = t? (t.cat||"main") : (view.startsWith("mat:")? view.slice(4):"main");
+  document.getElementById("f_due").value = t? (t.due||"") : "";
+  syncDateDisp("f_due");
+  document.getElementById("f_urgent").checked = t? !!t.urgent : false;
+  document.getElementById("f_important").checked = t? !!t.important : false;
+  document.getElementById("f_mit").checked = t? !!t.mit : false;
+  document.getElementById("f_status").value = t? t.status : "To do";
+  document.getElementById("f_step").value = t? (t.step||"") : "";
+  document.getElementById("f_link").value = t? (t.link||"") : "";
+  document.getElementById("delBtn").style.visibility = editing ? "visible" : "hidden";
+  setDetails(!editing);
+  updatePreview();
+  document.getElementById("overlay").classList.add("show");
+}
+function closeModal(){ document.getElementById("overlay").classList.remove("show"); }
+function updatePreview(){
+  const u=document.getElementById("f_urgent").checked, i=document.getElementById("f_important").checked;
+  const q=quadOf({urgent:u,important:i}); const info=QUADS[q];
+  const el=document.getElementById("preview");
+  el.textContent = "→ "+info.en+" · "+info.desc;
+  el.style.color = css("--"+q+"d");
+  el.style.background = css("--"+q+"b");
+}
+function saveTask(){
+  const name=document.getElementById("f_name").value.trim();
+  if(!name){ setDetails(true); alert("Please enter a task name."); return; }
+  const id=document.getElementById("f_id").value;
+  const existing = id ? tasks.find(x=>x.id===id) : null;
+  let status=document.getElementById("f_status").value;
+  const wasDone = existing && existing.status==="Done";
+  if(status==="Done" && !wasDone){
+    if(!confirm("Are you sure you have completed this task?")){
+      status = existing ? existing.status : "In progress";
+    }
+  }
+  const data={
+    name,
+    cat:document.getElementById("f_cat").value,
+    due:document.getElementById("f_due").value,
+    urgent:document.getElementById("f_urgent").checked,
+    important:document.getElementById("f_important").checked,
+    mit:document.getElementById("f_mit").checked,
+    status,
+    step:document.getElementById("f_step").value.trim(),
+    link:document.getElementById("f_link").value.trim(),
+  };
+  if(status==="Done") data.completedAt = (existing&&existing.completedAt) ? existing.completedAt : Date.now();
+  else data.completedAt = null;
+  let obj;
+  if(id){ Object.assign(existing, data); obj=existing; }
+  else{ data.id="t"+Date.now()+Math.random().toString(36).slice(2,6); tasks.push(data); obj=data; }
+  persistTask(obj); closeModal(); render();
+}
+function delTask(){
+  const id=document.getElementById("f_id").value;
+  if(id && confirm("Delete this task?")){ tasks=tasks.filter(x=>x.id!==id); removeTaskCloud(id); closeModal(); render(); }
+}
+function deleteTaskById(id){ if(confirm("Permanently delete this completed task?")){ tasks=tasks.filter(x=>x.id!==id); removeTaskCloud(id); render(); } }
+function restoreTask(id){ const t=tasks.find(x=>x.id===id); t.status="To do"; t.completedAt=null; t.mit=false; persistTask(t); render(); }
+function toggleMit(id,e){ e.stopPropagation(); const t=tasks.find(x=>x.id===id); t.mit=!t.mit; persistTask(t); render(); }
+function cycleStatus(id,e){
+  e.stopPropagation();
+  const t=tasks.find(x=>x.id===id);
+  const next=STATUSES[(STATUSES.indexOf(t.status)+1)%STATUSES.length];
+  if(next==="Done"){
+    if(!confirm("Are you sure you have completed this task?")) return;
+    t.completedAt=Date.now();
+  } else { t.completedAt=null; }
+  t.status=next; persistTask(t); render();
+}
+
+// ---------- render ----------
+function setView(v){ view=v; document.querySelectorAll(".tab").forEach(el=>el.classList.toggle("active",el.dataset.view===v)); render(); }
+function taskCard(t,opts={}){
+  const q=quadOf(t); const info=QUADS[q]; const done=t.status==="Done";
+  const overdue = t.due && t.due<todayStr() && !done;
+  const dueChip = t.due ? `<span class="chip ${overdue?'overdue':'due'}">📅 ${fmtDate(t.due)}${overdue?' · late':''}</span>` : "";
+  const linkHtml = t.link ? `<a class="link" href="${esc(t.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 Open link</a>` : "";
+  const stepHtml = t.step ? `<div class="step">⏸ ${esc(t.step)}</div>` : "";
+  const catChip = opts.showCat && CATS[t.cat] ? `<span class="chip cat">${CATS[t.cat].icon} ${CATS[t.cat].label}</span>` : "";
+  const quadChip = opts.showQuad ? `<span class="chip ${q}">${info.en}</span>` : "";
+  return `<div class="task ${done?'done':''}" style="border-left-color:${css('--'+q)}" onclick="openModal('${t.id}')">
+    <div class="top">
+      <div class="name">${esc(t.name)}</div>
+      <span class="star" title="MIT" onclick="toggleMit('${t.id}',event)">${t.mit?'⭐':'☆'}</span>
+    </div>
+    <div class="badges">
+      ${quadChip}${catChip}
+      <span class="chip st" onclick="cycleStatus('${t.id}',event)" title="Click to change">${t.status}</span>
+      ${dueChip}
+    </div>
+    ${stepHtml}${linkHtml}
+  </div>`;
+}
+function matrixHTML(cat){
+  const pool=tasks.filter(t=>t.cat===cat && t.status!=="Done");
+  const quad=q=>{
+    const items=pool.filter(t=>quadOf(t)===q);
+    const body = items.length ? items.map(t=>taskCard(t)).join("") : `<div class="qempty">— empty —</div>`;
+    return `<div class="quad ${q}">
+      <div class="qhead"><div class="en">${QUADS[q].en}</div><div class="desc">${QUADS[q].desc}</div></div>
+      <div class="qbody">${body}</div>
+    </div>`;
+  };
+  return `<div class="matrix-grid">
+    <div></div><div class="axis">Urgent</div><div class="axis">Not Urgent</div>
+    <div class="axis v">Important</div>${quad("q1")}${quad("q2")}
+    <div class="axis v">Not Important</div>${quad("q3")}${quad("q4")}
+  </div>`;
+}
+function completedHTML(){
+  const done=tasks.filter(t=>t.status==="Done").sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  const policy=`<div class="policy"><b>📋 Work log policy.</b> Completed tasks stay here for <b>${RETENTION_DAYS} days</b>, then auto-delete.
+  Why 30 days: it covers a daily progress check, the weekly review (GTD), and a monthly retrospective — the windows where reviewing past wins still boosts motivation and planning. After that the log is mostly clutter.</div>`;
+  if(!done.length) return policy+`<div class="empty">No completed tasks yet.<br>Finish a task (set status to <b>Done</b>) and it will appear here.</div>`;
+  const rows=done.map(t=>{
+    const days = t.completedAt ? Math.floor((Date.now()-t.completedAt)/86400000) : 0;
+    const left = Math.max(0, RETENTION_DAYS-days);
+    const compIso = t.completedAt ? new Date(t.completedAt).toISOString().slice(0,10) : "";
+    const leftTxt = left<=3 ? `<span class="soon">auto-deletes in ${left} day${left===1?'':'s'}</span>` : `auto-deletes in ${left} days`;
+    return `<div class="done-row">
+      <div class="nm"><div class="t">${esc(t.name)}</div>
+        <div class="meta">${CATS[t.cat]?CATS[t.cat].icon+' '+CATS[t.cat].label:''} · ${QUADS[quadOf(t)].en} · completed ${fmtDate(compIso)} · ${leftTxt}</div></div>
+      <button class="mini" onclick="restoreTask('${t.id}')">↩ Restore</button>
+      <button class="mini danger" onclick="deleteTaskById('${t.id}')">Delete</button>
+    </div>`;
+  }).join("");
+  return policy+`<div class="done-list">${rows}</div>`;
+}
+// ---------- calendar ----------
+function colorOf(id){ let h=0; for(const c of id) h=(h*31+c.charCodeAt(0))>>>0; const p=["#6366f1","#0ea5e9","#10b981","#f59e0b","#ec4899","#8b5cf6"]; return p[h%p.length]; }
+function calendarHTML(){
+  const first=new Date(calY,calM,1);
+  const offset=(first.getDay()+6)%7;
+  const dim=new Date(calY,calM+1,0).getDate();
+  const total=Math.ceil((offset+dim)/7)*7;
+  let cells="";
+  for(let i=0;i<total;i++){
+    const dn=i-offset+1;
+    if(dn<1||dn>dim){ cells+=`<div class="day out"></div>`; continue; }
+    const date=isoOf(calY,calM,dn);
+    const weekend = (i%7)>=5;            // Mon-first: cols 5,6 = Sat, Sun
+    const hol = VN_HOLIDAYS[date];
+    const evs=events.filter(e=>e.start<=date && date<=e.end).sort((a,b)=>(a.startTime||"").localeCompare(b.startTime||""));
+    const evHtml=evs.map(e=>{
+      const showTime=(date===e.start && e.startTime)? e.startTime+" " : "";
+      const pre=(e.start!==e.end && date!==e.start)? "… " : "";
+      return `<div class="ev" style="background:${colorOf(e.id)}" onmousedown="event.stopPropagation()" onclick="openEvent('${e.id}',null,null,event,!calEdit)">${pre}${esc(showTime)}${esc(e.title)}</div>`;
+    }).join("");
+    const cls = "day"+(date===todayStr()?" today":"")+(hol?" holiday":(weekend?" weekend":""));
+    const holHtml = hol ? `<span class="hol" title="${esc(hol)}">${esc(hol)}</span>` : "";
+    cells+=`<div class="${cls}" data-date="${date}"><span class="dnum">${dn}</span>${holHtml}${evHtml}</div>`;
+  }
+  const hint = calEdit
+    ? "Edit mode: click a day to add an event · drag across days for a multi-day event · click an event to edit"
+    : "View mode: click an event to see details. Switch to Edit to add or change.";
+  return `<div class="cal-head">
+    <div class="cal-title">${first.toLocaleString('en-US',{month:'long'})} ${calY}</div>
+    <div class="cal-nav">
+      <span class="mode-toggle">
+        <button class="${!calEdit?'on':''}" onclick="setCalMode(false)">👁 View</button>
+        <button class="${calEdit?'on':''}" onclick="setCalMode(true)">✎ Edit</button>
+      </span>
+      <button class="btn ghost" onclick="goToday()">Today</button>
+      <button class="btn ghost" onclick="prevMonth()">‹ Prev</button>
+      <button class="btn ghost" onclick="nextMonth()">Next ›</button>
+    </div>
+  </div>
+  <div class="cal-hint">${hint}</div>
+  <div class="cal-legend">
+    <span><i class="sw" style="background:#f4f7fb"></i> Weekend</span>
+    <span><i class="sw" style="background:#fdecea;border-color:#f3b4ae"></i> Vietnam holiday</span>
+    <span><i class="sw" style="background:#6366f1"></i> Event</span>
+  </div>
+  <div class="weekdays">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,i)=>`<div class="${i>=5?'we':''}">${d}</div>`).join("")}</div>
+  <div class="cal-grid">${cells}</div>`;
+}
+function setCalMode(v){ calEdit=v; render(); }
+function prevMonth(){ if(--calM<0){calM=11;calY--;} render(); }
+function nextMonth(){ if(++calM>11){calM=0;calY++;} render(); }
+function goToday(){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); render(); }
+
+let dragging=false,dragA=null,dragB=null;
+function paintSel(){
+  const [s,e]=[dragA,dragB].sort();
+  document.querySelectorAll(".day[data-date]").forEach(c=>{
+    const d=c.dataset.date; c.classList.toggle("sel", d>=s && d<=e);
+  });
+}
+function clearSel(){ document.querySelectorAll(".day.sel").forEach(c=>c.classList.remove("sel")); }
+function bindCalendar(){
+  if(!calEdit) return;   // View mode: no creating/dragging
+  document.querySelectorAll(".day[data-date]").forEach(cell=>{
+    cell.addEventListener("mousedown",e=>{ dragging=true; dragA=dragB=cell.dataset.date; paintSel(); });
+    cell.addEventListener("mouseenter",()=>{ if(dragging){ dragB=cell.dataset.date; paintSel(); } });
+  });
+}
+document.addEventListener("mouseup",()=>{
+  if(dragging){ dragging=false; const [s,e]=[dragA,dragB].sort(); clearSel(); if(calEdit) openEvent(null,s,e); }
+});
+
+// ---------- event modal ----------
+function openEvent(id, ps, pe, e, readOnly){
+  if(e) e.stopPropagation();
+  const ev = id ? events.find(x=>x.id===id) : null;
+  const ro = !!readOnly;
+  document.getElementById("evTitle").textContent = ro ? "Event details" : (ev ? "Edit event" : "New event");
+  document.getElementById("e_id").value = ev? ev.id : "";
+  document.getElementById("e_name").value = ev? ev.title : "";
+  document.getElementById("e_start").value = ev? ev.start : (ps||todayStr());
+  document.getElementById("e_end").value = ev? ev.end : (pe||ps||todayStr());
+  document.getElementById("e_stime").value = ev? (ev.startTime||"") : "";
+  document.getElementById("e_etime").value = ev? (ev.endTime||"") : "";
+  document.getElementById("e_note").value = ev? (ev.note||"") : "";
+  syncDateDisp("e_start"); syncDateDisp("e_end");
+  // lock/unlock fields depending on mode
+  ["e_name","e_start","e_end","e_stime","e_etime","e_note"].forEach(x=>document.getElementById(x).disabled=ro);
+  document.querySelectorAll("#evOverlay .date-clear").forEach(b=>b.style.display=ro?"none":"");
+  document.getElementById("evSaveBtn").style.display = ro? "none":"";
+  document.getElementById("evDelBtn").style.display = (ro||!ev)? "none":"";
+  document.getElementById("evCancelBtn").textContent = ro? "Close":"Cancel";
+  document.getElementById("evOverlay").classList.add("show");
+}
+function closeEvent(){ document.getElementById("evOverlay").classList.remove("show"); }
+function saveEvent(){
+  const title=document.getElementById("e_name").value.trim();
+  if(!title){ alert("Please enter an event name."); return; }
+  let start=document.getElementById("e_start").value || todayStr();
+  let end=document.getElementById("e_end").value || start;
+  if(end<start){ const tmp=start; start=end; end=tmp; }
+  const id=document.getElementById("e_id").value;
+  const data={ title, start, end,
+    startTime:document.getElementById("e_stime").value,
+    endTime:document.getElementById("e_etime").value,
+    note:document.getElementById("e_note").value.trim() };
+  let obj;
+  if(id){ obj=events.find(x=>x.id===id); Object.assign(obj, data); }
+  else{ data.id="e"+Date.now()+Math.random().toString(36).slice(2,6); events.push(data); obj=data; }
+  persistEvent(obj); closeEvent(); render();
+}
+function delEvent(){
+  const id=document.getElementById("e_id").value;
+  if(id && confirm("Delete this event?")){ events=events.filter(x=>x.id!==id); removeEventCloud(id); closeEvent(); render(); }
+}
+
+// ---------- main render ----------
+function render(){
+  const c=document.getElementById("content");
+  let html="", cnt="";
+  const order={q1:0,q2:1,q3:2,q4:3};
+  const byQuad=(a,b)=>order[quadOf(a)]-order[quadOf(b)];
+  if(view==="today"){
+    let list=tasks.filter(t=>(t.mit || t.due===todayStr()) && t.status!=="Done").sort(byQuad);
+    cnt=`${list.length} tasks today · ${tasks.filter(t=>t.mit&&t.status!=='Done').length} MIT`;
+    html = list.length
+      ? `<div class="today-list">`+list.map(t=>taskCard(t,{showQuad:true,showCat:true})).join("")+`</div>`
+      : `<div class="empty">No tasks for today.<br>Mark a task ⭐ MIT or set its Due date = today.</div>`;
+  }
+  else if(view.startsWith("mat:")){
+    const cat=view.slice(4); const n=tasks.filter(t=>t.cat===cat&&t.status!=="Done").length;
+    cnt=`${CATS[cat].icon} ${CATS[cat].label} · ${n} open tasks`;
+    html=matrixHTML(cat);
+  }
+  else if(view==="calendar"){ cnt=`${events.length} events`; html=calendarHTML(); }
+  else if(view==="completed"){ cnt=`${tasks.filter(t=>t.status==="Done").length} completed · auto-delete after ${RETENTION_DAYS} days`; html=completedHTML(); }
+  document.getElementById("count").textContent=cnt;
+  c.innerHTML=html;
+  if(view==="calendar") bindCalendar();
+  document.getElementById("seedBtn").style.display = (tasks.length||view==="calendar"||view==="completed") ? "none":"inline-block";
+}
+
+function seed(){
+  const today=todayStr();
+  tasks=[
+    {id:"s1",cat:"main",name:"Reply to urgent client email",urgent:true,important:true,mit:true,status:"In progress",step:"read the request, drafting a reply",link:"",due:today},
+    {id:"s2",cat:"main",name:"Plan next quarter's work",urgent:false,important:true,mit:true,status:"To do",step:"",link:"",due:""},
+    {id:"s3",cat:"main",name:"Schedule next week's team meeting",urgent:true,important:false,mit:false,status:"To do",step:"",link:"",due:today},
+    {id:"s4",cat:"main",name:"Clean up spam inbox",urgent:false,important:false,mit:false,status:"To do",step:"",link:"",due:""},
+    {id:"s5",cat:"group",name:"Prepare content for the union meeting",urgent:false,important:true,mit:false,status:"Paused",step:"outline done, still building slides",link:"",due:""},
+    {id:"s6",cat:"group",name:"Call to confirm the attendee list",urgent:true,important:false,mit:false,status:"To do",step:"",link:"",due:today},
+    {id:"s7",cat:"biz",name:"Finalize quote with the partner",urgent:true,important:true,mit:true,status:"To do",step:"",link:"https://example.com",due:today},
+    {id:"s8",cat:"biz",name:"Research market for the new product",urgent:false,important:true,mit:false,status:"To do",step:"",link:"",due:""},
+  ];
+  save(); if(cloud) tasks.forEach(persistTask); render();
+}
+
+document.getElementById("overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
+document.getElementById("evOverlay").addEventListener("click",e=>{ if(e.target.id==="evOverlay") closeEvent(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); closeEvent(); } });
+load();
+</script>
+</body>
+</html>
